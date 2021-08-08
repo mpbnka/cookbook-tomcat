@@ -10,8 +10,8 @@ execute 'yum_update_upgrade' do
 end
 
 # install jdk
-jdk_version = node[:tomcat][:jdk_version]
-package ['java-1.8.0-openjdk-devel'] do
+jdk_version = node[:tomcat][:java_install_version]
+package ["#{jdk_version}"] do
 	action :install
 end
 
