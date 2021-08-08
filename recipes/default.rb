@@ -4,19 +4,25 @@
 #
 # Copyright:: 2021, The Authors, All Rights Reserved.
 
+# update yum
+execute 'yum_update_upgrade' do
+	command 'yum update && sudo yum upgrade'
+end
+
 # install jdk
-yum_package ['java-1.8.0-openjdk-devel.x86_64', 'wget'] do
+jdk_version = node[:tomcat][:jdk_version]
+package ['java-1.8.0-openjdk-devel'] do
 	action :install
 end
 
 # Download tomcat
-tomcat_url = node['tomcat']['url']
+tomcat_url = node[:tomcat][:tomcat_url]
 
 script "Download Tomcat" do
 	interpreter "bash"
 	cwd "/tmp"
 	code <<-EOH
-		curl "#{tomcat_url}" --output "/tmp/apache-tomcat.tar.gz"
+		wget "#{tomcat_url}"
 	EOH
 end
 
@@ -43,18 +49,28 @@ end
 script "Extract Tomcat" do
 	interpreter "bash"
 	cwd "/tmp"
+	user "tomcat"
+	group "tomcat"
 	code <<-EOH
-		tar -zxvf /tmp/apache-tomcat.tar.gz -C #{tomcat_install_dir} --strip-components=1
+		tar xvf /tmp/apache-tomcat*.tar.gz -C #{tomcat_install_dir} --strip-components=1
 	EOH
 end
 
-path_service_file = node['tomcat']['path_service_file']
 # copy service file to destination
+path_service_file = node[:tomcat][:path_service_file]
 template "#{path_service_file}" do
-	source 'service.erb'
-	owner 'root'
-	group 'root'
+	source 'default.erb'
+	owner "tomcat"
+	group "tomcat"
 	mode '0755'
+end
+
+# make tomcat user owner for webapps work temp and logs directory
+execute "change owner for directories" do
+	cwd "#{tomcat_install_dir}"      
+      	command "chown -R tomcat webapps/ work/ temp/ logs/"
+	user "root"
+	action :run
 end
 
 # Reload systemctl daemon
@@ -78,7 +94,7 @@ end
 script "Start Tomcat" do
 	interpreter "bash"
 	code <<-EOH
-		systemctl start tomcat
+		systemctl start tomcat.service
 	EOH
 end
 
@@ -86,7 +102,6 @@ end
 script "Enable Tomcat" do
 	        interpreter "bash"
         code <<-EOH
-                systemctl enable tomcat
+                systemctl enable tomcat.service
         EOH
 end
-
